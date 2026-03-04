@@ -29,7 +29,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: deepcool-digital-windows
-          path: target/release/deepcool-digital-linux.exe
+          path: |
+            target/release/deepcool-digital-linux.exe
+            driver/WinRing0x64.sys
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -41,9 +43,11 @@ jobs:
       - uses: actions/download-artifact@v4
       - run: |
           mv deepcool-digital-linux/deepcool-digital-linux deepcool-digital-linux-amd64
-          mv deepcool-digital-windows/deepcool-digital-linux.exe deepcool-digital-windows-amd64.exe
+          mv deepcool-digital-windows/target/release/deepcool-digital-linux.exe deepcool-digital-windows-amd64.exe
+          mv deepcool-digital-windows/driver/WinRing0x64.sys WinRing0x64.sys
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             deepcool-digital-linux-amd64
             deepcool-digital-windows-amd64.exe
+            WinRing0x64.sys
