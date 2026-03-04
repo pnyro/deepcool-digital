@@ -51,9 +51,24 @@ mod common_warnings {
 }
 
 fn main() {
+    // Enable ANSI color support on Windows
+    #[cfg(target_os = "windows")]
+    let _ = colored::control::set_virtual_terminal(true);
+
+    // Check for admin privileges on Windows
+    #[cfg(target_os = "windows")]
+    {
+        if !is_elevated() {
+            error!("This program must be run as Administrator");
+            eprintln!("         Right-click the executable and select \"Run as administrator\",");
+            eprintln!("         or run from an elevated PowerShell/Command Prompt.");
+            exit(1);
+        }
+    }
+
     // Read args
     let args = Args::read();
-    println!("--- Deepcool Digital Linux ---");
+    println!("--- Deepcool Digital ---");
 
     // Find dedicated or integrated GPU
     let pci_device = {
@@ -444,5 +459,32 @@ fn main() {
             println!("Vendor name: {}", info.manufacturer_string().unwrap().bright_cyan());
             println!("Device name: {}", info.product_string().unwrap().bright_cyan());
         }
+    }
+}
+
+/// Checks if the current process is running with elevated (Administrator) privileges.
+#[cfg(target_os = "windows")]
+fn is_elevated() -> bool {
+    use std::mem;
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY};
+    use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+
+    unsafe {
+        let mut token = Default::default();
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token).is_err() {
+            return false;
+        }
+        let mut elevation = TOKEN_ELEVATION::default();
+        let mut size = 0u32;
+        let ok = GetTokenInformation(
+            token,
+            TokenElevation,
+            Some(&mut elevation as *mut _ as *mut _),
+            mem::size_of::<TOKEN_ELEVATION>() as u32,
+            &mut size,
+        );
+        let _ = CloseHandle(token);
+        ok.is_ok() && elevation.TokenIsElevated != 0
     }
 }
