@@ -1,28 +1,54 @@
 # Table of Contents
 - [About](#about)
 - [Installation](#installation)
+  - [Windows](#windows)
+  - [Linux](#linux)
 - [Supported Devices](#supported-devices)
     - [MYSTIQUE Series](#mystique-series)
 - [Usage](#usage)
 - [Automatic Start](#automatic-start)
+    - [Windows](#windows-1)
     - [Systemd](#systemd-arch-debian-ubuntu-fedora-etc)
     - [OpenRC](#openrc-gentoo-artix-linux-etc)
 - [Building from Source](#building-from-source)
 - [Device List](#more-information)
 
 # About
-This CLI program is meant to replicate the functionality of the original `DeepCool Digital`
-Windows program and I am gradually adding support to new devices.
+A lightweight, open-source alternative to DeepCool's official bloated Windows software. This is a
+[fork](https://github.com/Nortank12/deepcool-digital-linux) that adds **Windows support** while
+keeping the original Linux functionality fully intact.
+
+This CLI program drives the small status display on DeepCool coolers and cases, showing CPU/GPU
+temperature, usage, power, and clock speed. No telemetry, no background services, no unnecessary
+UI — just a single executable.
+
+> **Linux users**: This fork is fully compatible with the original project. All Linux functionality
+> is unchanged.
 
 If you have a device that has not been added or tested yet, please read the notes below the
 supported devices.
 If you think you can collaborate, please write an issue so we can get in touch.
 
 # Installation
-Simply download the latest [release](https://github.com/Nortank12/deepcool-digital-linux/releases)
+
+## Windows
+1. Download `deepcool-digital-windows-amd64.exe` and `WinRing0x64.sys` from the latest [release](https://github.com/pnyro/deepcool-digital/releases)
+2. Place both files in the same folder
+3. Run the exe as **Administrator** (required for USB HID access and CPU temperature)
+
+> [!NOTE]
+> `WinRing0x64.sys` is a signed kernel driver used to read CPU temperature from AMD Ryzen processors.
+> Windows Defender may flag it — this is a [known false positive](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/issues/1660)
+> common to all hardware monitoring tools. You can verify the driver's digital signature:
+> ```powershell
+> Get-AuthenticodeSignature .\WinRing0x64.sys
+> ```
+
+## Linux
+Download the latest [release](https://github.com/pnyro/deepcool-digital/releases)
 and make it executable:
 ```bash
-chmod +x deepcool-digital-linux
+chmod +x deepcool-digital-linux-amd64
 ```
 You will need root permission to send data to the device.
 
@@ -345,6 +371,12 @@ For example:
 - `deepcool-digital-cooler.service`
 
 # Automatic Start
+
+## Windows
+Create a scheduled task that runs at logon with admin privileges:
+```powershell
+schtasks /create /tn "DeepCool Digital" /tr "C:\path\to\deepcool-digital-windows-amd64.exe" /sc onlogon /rl highest
+```
 
 ## Systemd (Arch, Debian, Ubuntu, Fedora, etc.)
 1. Copy the `deepcool-digital-linux` to the `/usr/sbin/` folder
