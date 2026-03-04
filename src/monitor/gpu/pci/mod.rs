@@ -2,9 +2,6 @@
 
 mod pci_ids;
 
-use crate::error;
-use std::{fs::{read_dir, read_to_string}, process::exit};
-
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Vendor {
     Amd,
@@ -39,6 +36,7 @@ pub struct PciDevice {
     pub name: String,
 }
 
+#[cfg(target_os = "linux")]
 fn parse_pci_addr(addr: &str) -> Option<(u16, u8, u8, u8)> {
     // PCI Address Format:
     // 0000:00:00.0 | <domain>:<bus>:<device>.<function>
@@ -50,6 +48,7 @@ fn parse_pci_addr(addr: &str) -> Option<(u16, u8, u8, u8)> {
     Some((domain, bus, device, function))
 }
 
+#[cfg(target_os = "linux")]
 fn parse_pci_id(id: &str) -> Option<(u16, u16)> {
     // PCI ID Format:
     // 0000:0000 | <vendor>:<device>
@@ -60,7 +59,11 @@ fn parse_pci_id(id: &str) -> Option<(u16, u16)> {
 }
 
 /// Gets all GPUs from the PCI bus.
+#[cfg(target_os = "linux")]
 pub fn get_gpu_list() -> Vec<PciDevice> {
+    use crate::error;
+    use std::{fs::{read_dir, read_to_string}, process::exit};
+
     let pci_devices = read_dir("/sys/bus/pci/devices").unwrap_or_else(|_| {
         error!("Cannot read PCI devices");
         exit(1);
@@ -133,6 +136,58 @@ pub fn get_gpu_list() -> Vec<PciDevice> {
             }
             Err(_) => (),
         }
+    }
+
+    gpus
+}
+
+/// Gets all GPUs using DXGI on Windows.
+#[cfg(target_os = "windows")]
+pub fn get_gpu_list() -> Vec<PciDevice> {
+    use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, IDXGIFactory1, DXGI_ADAPTER_DESC1};
+
+    let factory: IDXGIFactory1 = match unsafe { CreateDXGIFactory1() } {
+        Ok(f) => f,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut gpus = Vec::new();
+    let mut idx = 0u32;
+
+    loop {
+        let adapter = match unsafe { factory.EnumAdapters1(idx) } {
+            Ok(a) => a,
+            Err(_) => break,
+        };
+        idx += 1;
+
+        let desc: DXGI_ADAPTER_DESC1 = match unsafe { adapter.GetDesc1() } {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
+
+        let vendor = match desc.VendorId {
+            0x1002 => Vendor::Amd,
+            0x10DE => Vendor::Nvidia,
+            0x8086 => Vendor::Intel,
+            _ => continue,
+        };
+
+        // Convert wide string description to String
+        let name_len = desc.Description.iter().position(|&c| c == 0).unwrap_or(desc.Description.len());
+        let name = String::from_utf16_lossy(&desc.Description[..name_len]);
+
+        // Use DXGI adapter index as a synthetic address
+        let address = format!("dxgi:{}", idx - 1);
+        // Treat adapter index 0 with Intel as iGPU (bus=0), others as discrete (bus=1)
+        let bus = if vendor == Vendor::Intel && idx == 1 { 0 } else { 1 };
+
+        gpus.push(PciDevice {
+            vendor,
+            bus,
+            address,
+            name: format!("{} {}", vendor.name(), name),
+        });
     }
 
     gpus

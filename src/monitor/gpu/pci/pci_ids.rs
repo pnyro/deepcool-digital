@@ -1,18 +1,21 @@
 //! Parses the `pci.ids` database and maps the name of all AMD, Intel, and NVIDIA GPUs to their product IDs.
 
 use super::Vendor;
-use std::{collections::HashMap, fs::File, io::{BufRead, BufReader}, path::Path};
-
-const PCI_IDS_PATHS: [&str; 3] = [
-    "/usr/share/misc/pci.ids",
-    "/usr/share/hwdata/pci.ids",
-    "/var/lib/pciutils/pci.ids",
-];
+use std::collections::HashMap;
 
 /// Returns a HashMap of Vendor, Device ID, and Subsystem ID.
 ///
 /// Format: `(vendor_name, device_id, Option<(subsystem_vendor_id, subsystem_device_id)>)`
+#[cfg(target_os = "linux")]
 pub fn get_device_names() -> Option<HashMap<(Vendor, u16, Option<(u16, u16)>), String>> {
+    use std::{fs::File, io::{BufRead, BufReader}, path::Path};
+
+    const PCI_IDS_PATHS: [&str; 3] = [
+        "/usr/share/misc/pci.ids",
+        "/usr/share/hwdata/pci.ids",
+        "/var/lib/pciutils/pci.ids",
+    ];
+
     let mut devices: HashMap<(Vendor, u16, Option<(u16, u16)>), String> = HashMap::new();
 
     let file = PCI_IDS_PATHS.iter().find_map(|path| {
@@ -87,5 +90,12 @@ pub fn get_device_names() -> Option<HashMap<(Vendor, u16, Option<(u16, u16)>), S
         }
     }
 
+    None
+}
+
+/// On Windows, GPU names come from DXGI directly — no pci.ids needed.
+#[cfg(target_os = "windows")]
+#[allow(dead_code)]
+pub fn get_device_names() -> Option<HashMap<(Vendor, u16, Option<(u16, u16)>), String>> {
     None
 }

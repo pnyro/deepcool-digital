@@ -17,6 +17,7 @@ struct Utilization {
     memory: u32,
 }
 
+#[cfg(target_os = "linux")]
 const LIB_PATHS: [&str; 12] = [
     "/usr/lib/x86_64-linux-gnu/nvidia/current/libnvidia-ml.so",
     "/usr/lib/x86_64-linux-gnu/nvidia/current/libnvidia-ml.so.1",
@@ -32,6 +33,13 @@ const LIB_PATHS: [&str; 12] = [
     "/run/opengl-driver/lib/libnvidia-ml.so.1",
 ];
 
+#[cfg(target_os = "windows")]
+const LIB_PATHS: [&str; 3] = [
+    "nvml.dll",
+    "C:\\Windows\\System32\\nvml.dll",
+    "C:\\Program Files\\NVIDIA Corporation\\NVSMI\\nvml.dll",
+];
+
 pub struct Gpu {
     lib: Library,
     device: *mut u8,
@@ -41,8 +49,12 @@ impl Gpu {
     /// Initializes NVML with the GPU specified by its PCI address.
     pub fn new(pci_address: &str) -> Self {
         unsafe {
-            // Try to open `libnvidia-ml.so` directly, on error use `LIB_PATHS` as fallback
-            let lib = Library::new("libnvidia-ml.so").unwrap_or_else(|_| {
+            // Try to open the NVML library directly, on error use `LIB_PATHS` as fallback
+            #[cfg(target_os = "linux")]
+            let lib_name = "libnvidia-ml.so";
+            #[cfg(target_os = "windows")]
+            let lib_name = "nvml.dll";
+            let lib = Library::new(lib_name).unwrap_or_else(|_| {
                 LIB_PATHS
                     .iter()
                     .find_map(|path| {
